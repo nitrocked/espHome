@@ -2,8 +2,12 @@
 
 ## [Unreleased]
 
+### TODO
+- Add control for porche lights, temp, etc.
+- Put password to secrets.yaml
+- Test
 ### Added
-- 
+- Compile configuration nodes script
 
 ### Changed
 - 
@@ -24,6 +28,4 @@
 ### Added
 - Initial release
 - Garage lock node for main entrance door lock
-    - TODO: Add control for porche lights, temp, etc.
-    - Not testest
 

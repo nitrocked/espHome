@@ -1,14 +1,24 @@
 esphome:
-  name: k_garage_lock
+  name: garage-lock
   platform: esp8266
   board: nodemcu
   project:
-    name: "vcj.klint_land"
+    name: "vcj.klint-land"
     version: "1.0.0"
 
+ota:
+  - platform: esphome
+    password: "MrvllVlly_2022"
+    port: 8266
+
 wifi:
-  ssid: "VOZPLUS_AVATEL_5G-v2Ea"
-  password: "hUmheJzG"
+  networks:
+    - ssid: "KLAND_FF00"
+      password: "MrvllVlly_2022"
+    - ssid: "VOZPLUS_AVATEL_v2Ea"
+      password: "hUmheJzG"
+    - ssid: "VOZPLUS_AVATEL_5G-v2Ea"
+      password: "hUmheJzG"
   
   # Modo AP para recuperación
   ap:
@@ -18,6 +28,7 @@ wifi:
 # Servidor web para acceso local
 web_server:
   port: 80
+  version: 2
 
 logger:
   level: DEBUG
@@ -31,16 +42,13 @@ api:
         - lambda: |-
             id(relay_active) = false;
             ESP_LOGD("API", "Relay Active reset to false.");
-
-ota:
-
 globals:
   - id: relay_active
     type: bool
     initial_value: "false"
   - id: block_time
     type: int
-    initial_value: 20  # Tiempo de bloqueo inicial (en segundos)
+    initial_value: "20"  # Tiempo de bloqueo inicial (en segundos)
 
 # Control desde Home Assistant
 number:
@@ -51,18 +59,18 @@ number:
     max_value: 60
     step: 1
     unit_of_measurement: "s"
-    initial_value: 30
+    initial_value: "30"
     set_action:
       - lambda: |-
           id(block_time) = (int) x;
           ESP_LOGD("number", "Block time set to %d seconds", id(block_time));
 
-# Sensor para entrada de 12V
+# Sensores combinados
 binary_sensor:
   - platform: gpio
     pin:
       number: D1  # GPIO conectado a la señal de 12V (divisor de tensión)
-      mode: INPUT_PULLDOWN
+      mode: INPUT  # Cambiado porque solo GPIO16 soporta PULLDOWN
     name: "12/24V Input"
     filters:
       - delayed_on: 30ms  # Evitar falsos positivos
@@ -86,28 +94,26 @@ binary_sensor:
                     id(relay_active) = false;
                     id(block_time_indicator).publish_state(false);
 
+  - platform: template
+    name: "Block status"
+    id: block_time_indicator
+    device_class: "lock"  # Ícono de candado en Home Assistant
+
 # Salida para el relé
 output:
   - platform: gpio
     pin: D2  # GPIO conectado al módulo de relé
     id: relay_output
 
-# Indicador de estado de bloqueo
-binary_sensor:
-  - platform: template
-    name: "Block status"
-    id: block_time_indicator
-    device_class: "lock"  # Ícono de candado en Home Assistant
-
-# Control desde el servidor web
-web_component:
-  - platform: slider
-    name: "Block time (s)"
-    min_value: 5
-    max_value: 60
-    step: 1
-    initial_value: 20
-    on_value:
-      lambda: |-
-        id(block_time) = (int) x;
-        ESP_LOGD("web", "Block time set to %d seconds from web interface.");
+# # Control desde el servidor web
+# web_component:
+#   - platform: slider
+#     name: "Block time (s)"
+#     min_value: 5
+#     max_value: 60
+#     step: 1
+#     initial_value: 20
+#     on_value:
+#       lambda: |-
+#         id(block_time) = (int) x;
+#         ESP_LOGD("web", "Block time set to %d seconds from web interface.");
