@@ -29,14 +29,14 @@ fi
 # Display the current version of esphome
 echo "espHome $(esphome --version)"
 
-# Create a menu option by listing all folders inside the configurations folder (give a number to each one) and let me choose one by numbering them and selecting the number take all yaml files in that folder and compile them
-# List all folders inside the configurations folder
-CONFIGURATIONS_FOLDER="./configurations"
-CONFIGURATIONS=($(ls -d ${CONFIGURATIONS_FOLDER}/*/))
+# Create a menu option by listing all .yaml files inside the configurations folder (give a number to each one) and let me choose one by numbering them 
+CONFIGURATIONS_FOLDER="./nodes"
+FIRMWARES_FOLDER="./firmwares"
+CONFIGURATIONS=($(ls -d ${CONFIGURATIONS_FOLDER}/*.yaml))
 
 # Display the list of configurations
 echo ""
-echo "| Select a configuration to compile:"
+echo "| Available YAMLs:"
 echo "|"
 for i in "${!CONFIGURATIONS[@]}"; do
     echo "|  $i: ${CONFIGURATIONS[$i]}"
@@ -44,7 +44,7 @@ done
 echo "|"
 
 # Read the user input
-read -p "| > Select node to compile: " CONFIGURATION_NUMBER
+read -p "| > Select YAML to compile: " CONFIGURATION_NUMBER
 
 # Check if the input is a number
 if ! [[ "${CONFIGURATION_NUMBER}" =~ ^[0-9]+$ ]]; then
@@ -60,12 +60,10 @@ fi
 
 # Get the selected configuration folder
 SELECTED_CONFIGURATION="${CONFIGURATIONS[${CONFIGURATION_NUMBER}]}"
-echo "Selected configuration: ${SELECTED_CONFIGURATION}"
+echo "Compiling ${SELECTED_CONFIGURATION} ..."
 
-# Compile all yaml files in the selected configuration folder. Select only .yaml files
-for yaml_file in "${SELECTED_CONFIGURATION}"/*.yaml; do
-    esphome compile "${yaml_file}"
-done
+# Compile the selected configuration
+esphome compile ${SELECTED_CONFIGURATION}
 
 # Check if the compilation was successful
 if [ $? -eq 0 ]; then
@@ -77,12 +75,12 @@ fi
 
 # Copy the firmware.bin file to the current folder with a name based on the yaml file
 # Define the esphome name
-ESPHOME_NAME=$(basename ${SELECTED_CONFIGURATION})
+ESPHOME_NAME=$(basename ${SELECTED_CONFIGURATION} .yaml)
 ESPHOME_NAME=${ESPHOME_NAME%/}
 
 # Define the source and destination paths
-SOURCE_PATH=".esphome/build/${ESPHOME_NAME}/.pioenvs/${ESPHOME_NAME}/firmware.bin"
-DESTINATION_PATH="./firmware-${ESPHOME_NAME}.bin"
+SOURCE_PATH="${CONFIGURATIONS_FOLDER}/.esphome/build/${ESPHOME_NAME}/.pioenvs/${ESPHOME_NAME}/firmware.bin"
+DESTINATION_PATH="${FIRMWARES_FOLDER}/firmware-${ESPHOME_NAME}.bin"
 
 # Copy the firmware.bin file to the current folder
 cp "${SOURCE_PATH}" "${DESTINATION_PATH}"

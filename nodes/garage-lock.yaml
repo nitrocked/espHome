@@ -123,12 +123,13 @@ binary_sensor:
                     id(block_time_indicator).publish_state(true);
                 - delay: !lambda "return id(lock_time) * 1000;"
                 - output.turn_on: relay_output_lock # Inactive HIGH
-                - logger.log: "Switching lock relay OFF"
-                - delay: !lambda "return id(block_time) * 1000;"
                 - lambda: |-
                     id(relay_active) = false;
                     id(block_time_indicator).publish_state(false);
-
+                - logger.log: "Switching lock relay OFF"
+                - logger.log: "Blocking lock OFF for $block_time ms"
+                - delay: !lambda "return id(block_time) * 1000;"
+                
   - platform: template
     name: "Block status"
     id: block_time_indicator
@@ -158,9 +159,10 @@ display:
     address: 0x3C
     contrast: 40%
     lambda: |-
-      it.print(0, 0, id(font_12), "Garage Lock");
+      it.print(0, 0, id(font_12), "Klint Land`s Garage Lock");
       it.printf(0, 10, id(font_12), "Block Time: %ds", id(block_time));
-      it.printf(0, 20, id(font_12), "Status: %s", id(block_time_indicator).state ? "Blocked" : "Unblocked");
+      it.printf(0, 40, id(font_12), "Lock ON Delay: %dms", id(lock_delay_time));
+      it.printf(0, 20, id(font_12), "Lock block: %s", id(block_time_indicator).state ? "ON" : "OFF");
       it.printf(0, 30, id(font_12), "Relay: %s", id(relay_active) ? "ON" : "OFF");
 
 font:

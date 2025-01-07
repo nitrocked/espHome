@@ -12,7 +12,7 @@
 - SSD1306 128x64 Test
 
 ### Changed
-- 
+- Proeject Folder structure
 
 ### Deprecated
 - 
