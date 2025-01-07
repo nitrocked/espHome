@@ -19,7 +19,7 @@ wifi:
       password: "hUmheJzG"
     - ssid: "VOZPLUS_AVATEL_5G-v2Ea"
       password: "hUmheJzG"
-  
+
   # Modo AP para recuperación
   ap:
     ssid: "KLAND_GRGLCK"
@@ -48,48 +48,83 @@ globals:
     initial_value: "false"
   - id: block_time
     type: int
-    initial_value: "20"  # Tiempo de bloqueo inicial (en segundos)
+    initial_value: "20" # Initial block time value (s)
+  - id: lock_delay_time
+    type: int
+    initial_value: "200" # Initial lock delay to open value (ms)
+  - id: lock_time
+    type: int
+    initial_value: "1" # Initial lock open time value (s)
 
 # Control desde Home Assistant
 number:
   - platform: template
-    name: "Tiempo de Bloqueo (segundos)"
+    name: "Block Time (s)"
     icon: "mdi:timer"
     min_value: 5
     max_value: 60
-    step: 1
+    step: 5
     unit_of_measurement: "s"
-    initial_value: "30"
+    initial_value: "20"
     set_action:
       - lambda: |-
           id(block_time) = (int) x;
           ESP_LOGD("number", "Block time set to %d seconds", id(block_time));
+  - platform: template
+    name: "Lock Delay Time (ms)"
+    icon: "mdi:timer"
+    min_value: 100
+    max_value: 1000
+    step: 100
+    unit_of_measurement: "ms"
+    initial_value: "500"
+    set_action:
+      - lambda: |-
+          id(lock_delay_time) = (int) x;
+          ESP_LOGD("number", "Lock delay open time set to %d miliseconds", id(lock_delay_time));
+  - platform: template
+    name: "Lock Time (ms)"
+    icon: "mdi:timer"
+    min_value: 500
+    max_value: 2000
+    step: 250
+    unit_of_measurement: "ms"
+    initial_value: "1000"
+    set_action:
+      - lambda: |-
+          id(lock_time) = (int) x;
+          ESP_LOGD("number", "Lock open time set to %d miliseconds", id(lock_time));
 
 # Sensores combinados
+# GPIO14: 12V Input
+# GPIO13: Porche Lights
+# GPIO12: Door Lock
+# GPIO5: SDA 128x64 OLED Display
+# GPIO4: SCL 128x64 OLED Display
+
 binary_sensor:
   - platform: gpio
     pin:
-      number: D1  # GPIO conectado a la señal de 12V (divisor de tensión)
-      mode: INPUT  # Cambiado porque solo GPIO16 soporta PULLDOWN
+      number: GPIO14 # GPIO conectado a la señal de 12V (divisor de tensión)
+      mode: INPUT
     name: "12/24V Input"
     filters:
-      - delayed_on: 30ms  # Evitar falsos positivos
+      - delayed_on: 30ms # To avoid false positives
     on_press:
       - then:
           - if:
               condition:
                 - lambda: "return !id(relay_active);"
               then:
-                - logger.log: "Switching relay ON for 1s."
-                - output.turn_on: relay_output
-                - delay: 1s
-                - output.turn_off: relay_output
-                - logger.log: "Switching relay OFF"
+                - logger.log: "Switching lock relay ON for $lock_time seconds"
+                - output.turn_off: relay_output_lock # Active LOW
                 - lambda: |-
                     id(relay_active) = true;
-                - lambda: |-
                     id(block_time_indicator).publish_state(true);
-                - delay: !lambda "return id(block_time) * 1000;"  # Bloqueo dinámico
+                - delay: !lambda "return id(lock_time) * 1000;"
+                - output.turn_on: relay_output_lock # Inactive HIGH
+                - logger.log: "Switching lock relay OFF"
+                - delay: !lambda "return id(block_time) * 1000;"
                 - lambda: |-
                     id(relay_active) = false;
                     id(block_time_indicator).publish_state(false);
@@ -97,23 +132,38 @@ binary_sensor:
   - platform: template
     name: "Block status"
     id: block_time_indicator
-    device_class: "lock"  # Ícono de candado en Home Assistant
+    device_class: "lock" # Lock icon in Home Assistant
 
 # Salida para el relé
 output:
   - platform: gpio
-    pin: D2  # GPIO conectado al módulo de relé
-    id: relay_output
+    pin: GPIO12 # GPIO conectado al módulo de relé de la cerradura
+    id: relay_output_lock
+    # inverted: true
+  - platform: gpio
+    pin: GPIO13 # GPIO conectado al módulo de relé para luces del porche
+    id: relay_output_porche_lights
+    # inverted: true
 
-# # Control desde el servidor web
-# web_component:
-#   - platform: slider
-#     name: "Block time (s)"
-#     min_value: 5
-#     max_value: 60
-#     step: 1
-#     initial_value: 20
-#     on_value:
-#       lambda: |-
-#         id(block_time) = (int) x;
-#         ESP_LOGD("web", "Block time set to %d seconds from web interface.");
+# OLED display 0.96" SSD1306 128x64
+i2c:
+  sda: GPIO5
+  scl: GPIO4
+  scan: True
+  frequency: 100kHz
+
+display:
+  - platform: ssd1306_i2c
+    model: "SSD1306 128x64"
+    address: 0x3C
+    contrast: 40%
+    lambda: |-
+      it.print(0, 0, id(font_12), "Garage Lock");
+      it.printf(0, 10, id(font_12), "Block Time: %ds", id(block_time));
+      it.printf(0, 20, id(font_12), "Status: %s", id(block_time_indicator).state ? "Blocked" : "Unblocked");
+      it.printf(0, 30, id(font_12), "Relay: %s", id(relay_active) ? "ON" : "OFF");
+
+font:
+  - file: "font.ttf" # Courier New
+    id: font_12
+    size: 12

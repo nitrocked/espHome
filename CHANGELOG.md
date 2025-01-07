@@ -6,8 +6,10 @@
 - Add control for porche lights, temp, etc.
 - Put password to secrets.yaml
 - Test
+- Add web server security
 ### Added
 - Compile configuration nodes script
+- SSD1306 128x64 Test
 
 ### Changed
 - 

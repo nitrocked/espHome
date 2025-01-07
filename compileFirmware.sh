@@ -81,7 +81,7 @@ ESPHOME_NAME=$(basename ${SELECTED_CONFIGURATION})
 ESPHOME_NAME=${ESPHOME_NAME%/}
 
 # Define the source and destination paths
-SOURCE_PATH="./.pioenvs/${ESPHOME_NAME}/firmware.bin"
+SOURCE_PATH=".esphome/build/${ESPHOME_NAME}/.pioenvs/${ESPHOME_NAME}/firmware.bin"
 DESTINATION_PATH="./firmware-${ESPHOME_NAME}.bin"
 
 # Copy the firmware.bin file to the current folder
