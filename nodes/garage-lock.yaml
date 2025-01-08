@@ -20,12 +20,10 @@ wifi:
     - ssid: "VOZPLUS_AVATEL_5G-v2Ea"
       password: "hUmheJzG"
 
-  # Modo AP para recuperación
   ap:
     ssid: "KLAND_GRGLCK"
     password: "MrvllVlly_2022"
 
-# Servidor web para acceso local
 web_server:
   port: 80
   version: 2
@@ -34,29 +32,22 @@ logger:
   level: DEBUG
 
 api:
-  services:
-    # Habilitar servicios para control desde Home Assistant
-    - service: reset_relay_active
-      variables: {}
-      then:
-        - lambda: |-
-            id(relay_active) = false;
-            ESP_LOGD("API", "Relay Active reset to false.");
+
 globals:
   - id: relay_active
     type: bool
     initial_value: "false"
   - id: block_time
     type: int
-    initial_value: "20" # Initial block time value (s)
+    initial_value: "20" # Tiempo de bloqueo en segundos
   - id: lock_delay_time
     type: int
-    initial_value: "200" # Initial lock delay to open value (ms)
+    initial_value: "200" # Retardo antes de activar el relé (ms)
   - id: lock_time
     type: int
-    initial_value: "1" # Initial lock open time value (s)
+    initial_value: "1" # Tiempo de activación del relé (s)
 
-# Control desde Home Assistant
+# Control de valores desde Home Assistant
 number:
   - platform: template
     name: "Block Time (s)"
@@ -65,11 +56,10 @@ number:
     max_value: 60
     step: 5
     unit_of_measurement: "s"
-    initial_value: "20"
     set_action:
       - lambda: |-
           id(block_time) = (int) x;
-          ESP_LOGD("number", "Block time set to %d seconds", id(block_time));
+
   - platform: template
     name: "Lock Delay Time (ms)"
     icon: "mdi:timer"
@@ -77,11 +67,10 @@ number:
     max_value: 1000
     step: 100
     unit_of_measurement: "ms"
-    initial_value: "500"
     set_action:
       - lambda: |-
           id(lock_delay_time) = (int) x;
-          ESP_LOGD("number", "Lock delay open time set to %d miliseconds", id(lock_delay_time));
+
   - platform: template
     name: "Lock Time (ms)"
     icon: "mdi:timer"
@@ -89,83 +78,72 @@ number:
     max_value: 2000
     step: 250
     unit_of_measurement: "ms"
-    initial_value: "1000"
     set_action:
       - lambda: |-
           id(lock_time) = (int) x;
-          ESP_LOGD("number", "Lock open time set to %d miliseconds", id(lock_time));
 
-# Sensores combinados
-# GPIO14: 12V Input
-# GPIO13: Porche Lights
-# GPIO12: Door Lock
-# GPIO5: SDA 128x64 OLED Display
-# GPIO4: SCL 128x64 OLED Display
-
+# Sensores
 binary_sensor:
   - platform: gpio
     pin:
-      number: GPIO14 # GPIO conectado a la señal de 12V (divisor de tensión)
+      number: GPIO14 # GPIO para la señal de 12V
       mode: INPUT
     name: "12/24V Input"
     filters:
-      - delayed_on: 30ms # To avoid false positives
+      - delayed_on: 30ms
     on_press:
-      - then:
-          - if:
-              condition:
-                - lambda: "return !id(relay_active);"
-              then:
-                - logger.log: "Switching lock relay ON for $lock_time seconds"
-                - output.turn_off: relay_output_lock # Active LOW
-                - lambda: |-
-                    id(relay_active) = true;
-                    id(block_time_indicator).publish_state(true);
-                - delay: !lambda "return id(lock_time) * 1000;"
-                - output.turn_on: relay_output_lock # Inactive HIGH
-                - lambda: |-
-                    id(relay_active) = false;
-                    id(block_time_indicator).publish_state(false);
-                - logger.log: "Switching lock relay OFF"
-                - logger.log: "Blocking lock OFF for $block_time ms"
-                - delay: !lambda "return id(block_time) * 1000;"
-                
-  - platform: template
-    name: "Block status"
-    id: block_time_indicator
-    device_class: "lock" # Lock icon in Home Assistant
+      - if:
+          condition:
+            - lambda: "return !id(relay_active);" # Solo si no está activo
+          then:
+            - logger.log: "Activating lock relay after delay"
+            - delay: !lambda "return id(lock_delay_time);"
+            - output.turn_off: relay_output_lock # Activo LOW
+            - lambda: |-
+                id(relay_active) = true;
+            - delay: !lambda "return id(lock_time) * 1000;"
+            - output.turn_on: relay_output_lock # Inactivo HIGH
+            - logger.log: "Deactivating lock relay"
+            - delay: !lambda "return id(block_time) * 1000;" # Tiempo de bloqueo
+            - lambda: |-
+                id(relay_active) = false;
 
-# Salida para el relé
+  - platform: template
+    name: "Block Status"
+    id: block_time_indicator
+    device_class: lock
+
+# Salidas
 output:
   - platform: gpio
-    pin: GPIO12 # GPIO conectado al módulo de relé de la cerradura
+    pin: GPIO12 # Cerradura
     id: relay_output_lock
-    # inverted: true
-  - platform: gpio
-    pin: GPIO13 # GPIO conectado al módulo de relé para luces del porche
-    id: relay_output_porche_lights
-    # inverted: true
+    inverted: false # Activo LOW
 
-# OLED display 0.96" SSD1306 128x64
+switch:
+  - platform: gpio
+    name: "Porche Lights"
+    pin: GPIO13 # Luz del porche
+    id: relay_output_porche_lights
+    inverted: false # Normal
+
+# OLED Display
 i2c:
   sda: GPIO5
   scl: GPIO4
-  scan: True
-  frequency: 100kHz
+  scan: true
 
 display:
   - platform: ssd1306_i2c
     model: "SSD1306 128x64"
     address: 0x3C
-    contrast: 40%
     lambda: |-
-      it.print(0, 0, id(font_12), "Klint Land`s Garage Lock");
-      it.printf(0, 10, id(font_12), "Block Time: %ds", id(block_time));
-      it.printf(0, 40, id(font_12), "Lock ON Delay: %dms", id(lock_delay_time));
-      it.printf(0, 20, id(font_12), "Lock block: %s", id(block_time_indicator).state ? "ON" : "OFF");
-      it.printf(0, 30, id(font_12), "Relay: %s", id(relay_active) ? "ON" : "OFF");
+      it.print(0, 0, id(font_12), "Klint Land's Garage Lock");
+      it.printf(0, 12, id(font_12), "Block Time: %ds", id(block_time));
+      it.printf(0, 24, id(font_12), "Relay Active: %s", id(relay_active) ? "ON" : "OFF");
+      it.printf(0, 36, id(font_12), "Porche Lights: %s", id(relay_output_porche_lights).state ? "ON" : "OFF");
 
 font:
-  - file: "font.ttf" # Courier New
+  - file: "font.ttf"
     id: font_12
     size: 12

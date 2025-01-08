@@ -26,9 +26,6 @@ else
     exit 1
 fi
 
-# Display the current version of esphome
-echo "espHome $(esphome --version)"
-
 # Create a menu option by listing all .yaml files inside the configurations folder (give a number to each one) and let me choose one by numbering them 
 CONFIGURATIONS_FOLDER="./nodes"
 FIRMWARES_FOLDER="./firmwares"
