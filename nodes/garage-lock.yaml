@@ -31,23 +31,22 @@ web_server:
 logger:
   level: DEBUG
 
-api:
+# api: // Descomentar para activar la API. Si activo, se reinicia a los 15min si no hay clientes
 
 globals:
-  - id: relay_active
-    type: bool
-    initial_value: "false"
   - id: block_time
     type: int
-    initial_value: "20" # Tiempo de bloqueo en segundos
+    initial_value: "10000" # Tiempo de bloqueo en milisegundos
+  - id: blocked_lock
+    type: bool
+    initial_value: "false"
   - id: lock_delay_time
     type: int
     initial_value: "200" # Retardo antes de activar el relé (ms)
   - id: lock_time
     type: int
-    initial_value: "1" # Tiempo de activación del relé (s)
+    initial_value: "500" # Tiempo de activación del relé (ms)
 
-# Control de valores desde Home Assistant
 number:
   - platform: template
     name: "Block Time (s)"
@@ -55,18 +54,18 @@ number:
     min_value: 5
     max_value: 60
     step: 5
-    unit_of_measurement: "s"
+    unit_of_measurement: s
     set_action:
       - lambda: |-
-          id(block_time) = (int) x;
+          id(block_time) = (int) x * 1000;
 
   - platform: template
     name: "Lock Delay Time (ms)"
     icon: "mdi:timer"
-    min_value: 100
-    max_value: 1000
+    min_value: 200
+    max_value: 2000
     step: 100
-    unit_of_measurement: "ms"
+    unit_of_measurement: ms
     set_action:
       - lambda: |-
           id(lock_delay_time) = (int) x;
@@ -75,75 +74,81 @@ number:
     name: "Lock Time (ms)"
     icon: "mdi:timer"
     min_value: 500
-    max_value: 2000
-    step: 250
-    unit_of_measurement: "ms"
+    max_value: 4000
+    step: 500
+    unit_of_measurement: ms
     set_action:
       - lambda: |-
           id(lock_time) = (int) x;
 
-# Sensores
 binary_sensor:
   - platform: gpio
-    pin:
-      number: GPIO14 # GPIO para la señal de 12V
-      mode: INPUT
-    name: "12/24V Input"
+    pin: GPIO14
+    name: "24V Input"
+    device_class: running
     filters:
-      - delayed_on: 30ms
+      - delayed_on: 5ms
     on_press:
       - if:
           condition:
-            - lambda: "return !id(relay_active);" # Solo si no está activo
+            lambda: return !id(blocked_lock);
           then:
-            - logger.log: "Activating lock relay after delay"
+            - lambda: id(blocked_lock) = true;
             - delay: !lambda "return id(lock_delay_time);"
-            - output.turn_off: relay_output_lock # Activo LOW
-            - lambda: |-
-                id(relay_active) = true;
-            - delay: !lambda "return id(lock_time) * 1000;"
-            - output.turn_on: relay_output_lock # Inactivo HIGH
-            - logger.log: "Deactivating lock relay"
-            - delay: !lambda "return id(block_time) * 1000;" # Tiempo de bloqueo
-            - lambda: |-
-                id(relay_active) = false;
-
-  - platform: template
-    name: "Block Status"
-    id: block_time_indicator
-    device_class: lock
-
-# Salidas
-output:
-  - platform: gpio
-    pin: GPIO12 # Cerradura
-    id: relay_output_lock
-    inverted: false # Activo LOW
+            - switch.turn_on: relay_output_lock
+            - delay: !lambda "return id(block_time);"
+            - lambda: id(blocked_lock) = false;
 
 switch:
   - platform: gpio
+    pin: GPIO13
     name: "Porche Lights"
-    pin: GPIO13 # Luz del porche
     id: relay_output_porche_lights
-    inverted: false # Normal
+    inverted: true
+    icon: "mdi:lightbulb"
 
-# OLED Display
+  - platform: gpio
+    pin: GPIO12
+    name: "Gate Lock"
+    id: relay_output_lock
+    inverted: true
+    icon: "mdi:gate"
+    on_turn_on:
+      - delay: !lambda "return id(lock_time);"
+      - switch.turn_off: relay_output_lock
+
 i2c:
   sda: GPIO5
   scl: GPIO4
   scan: true
+  frequency: 400kHz
 
 display:
   - platform: ssd1306_i2c
     model: "SSD1306 128x64"
+    reset_pin: D0
     address: 0x3C
+    contrast: 35%
     lambda: |-
-      it.print(0, 0, id(font_12), "Klint Land's Garage Lock");
-      it.printf(0, 12, id(font_12), "Block Time: %ds", id(block_time));
-      it.printf(0, 24, id(font_12), "Relay Active: %s", id(relay_active) ? "ON" : "OFF");
-      it.printf(0, 36, id(font_12), "Porche Lights: %s", id(relay_output_porche_lights).state ? "ON" : "OFF");
+      it.print(0, 0, id(font_12), " +|- Klint -|+");
+      it.printf(0, 12, id(font_12), "Block: %s", id(blocked_lock) ? "ON" : "OFF");
+      it.printf(0, 24, id(font_12), "Lock: %s", id(relay_output_lock) ? "ON" : "OFF");
+      it.printf(0, 36, id(font_12), "Lights: %s", id(relay_output_porche_lights) ? "ON" : "OFF");
+      it.printf(0, 48, id(font_12), "%.1f°C | %.1f%%", id(porche_temperature).state, id(porche_humidity).state);
 
 font:
   - file: "font.ttf"
     id: font_12
     size: 12
+
+sensor:
+  - platform: dht
+    model: DHT11
+    pin: GPIO2
+    temperature:
+      name: "Porche Temperature"
+      id: porche_temperature
+    humidity:
+      name: "Porche Humidity"
+      id: porche_humidity
+    update_interval: 10min

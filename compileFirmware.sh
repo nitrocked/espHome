@@ -23,7 +23,6 @@ if [ -z "${VIRTUAL_ENV}" ]; then
     source venv/bin/activate
 else
     echo "Virtual environment already activated"
-    exit 1
 fi
 
 # Create a menu option by listing all .yaml files inside the configurations folder (give a number to each one) and let me choose one by numbering them 
@@ -77,9 +76,20 @@ ESPHOME_NAME=${ESPHOME_NAME%/}
 
 # Define the source and destination paths
 SOURCE_PATH="${CONFIGURATIONS_FOLDER}/.esphome/build/${ESPHOME_NAME}/.pioenvs/${ESPHOME_NAME}/firmware.bin"
+SOURCE_OTA_PATH="${CONFIGURATIONS_FOLDER}/.esphome/build/${ESPHOME_NAME}/.pioenvs/${ESPHOME_NAME}/firmware.ota.bin"
+DESTINATION_OTA_PATH="${FIRMWARES_FOLDER}/firmware-${ESPHOME_NAME}.ota.bin"
 DESTINATION_PATH="${FIRMWARES_FOLDER}/firmware-${ESPHOME_NAME}.bin"
 
 # Copy the firmware.bin file to the current folder
+cp "${SOURCE_OTA_PATH}" "${DESTINATION_OTA_PATH}"
+# Check if the copy was successful
+if [ $? -eq 0 ]; then
+    echo "Firmware OTA copied successfully to ${DESTINATION_PATH}"
+else
+    echo "Failed to copy Firmware OTA"
+    exit 1
+fi
+
 cp "${SOURCE_PATH}" "${DESTINATION_PATH}"
 
 # Check if the copy was successful

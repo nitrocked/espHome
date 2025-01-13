@@ -3,16 +3,20 @@
 ## [Unreleased]
 
 ### TODO
-- Add control for porche lights, temp, etc.
 - Put password to secrets.yaml
-- Test
-- Add web server security
+
 ### Added
 - Compile configuration nodes script
-- SSD1306 128x64 Test
+    - Regular firmware
+    - OTA Firmware
+- SSD1306 128x64
+- Porche lights
+- DHT11 Temp and humidity sensor
 
 ### Changed
 - Proeject Folder structure
+- Logic by using integrated espHome switches
+- Tested ok
 
 ### Deprecated
 - 
