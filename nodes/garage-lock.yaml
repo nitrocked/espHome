@@ -8,21 +8,21 @@ esphome:
 
 ota:
   - platform: esphome
-    password: "MrvllVlly_2022"
+    password: !secret gen_password
     port: 8266
 
 wifi:
   networks:
-    - ssid: "KLAND_FF00"
-      password: "MrvllVlly_2022"
-    - ssid: "VOZPLUS_AVATEL_v2Ea"
-      password: "hUmheJzG"
-    - ssid: "VOZPLUS_AVATEL_5G-v2Ea"
-      password: "hUmheJzG"
+    - ssid: !secret wifi_ssid_1
+      password: !secret gen_password
+    - ssid: !secret wifi_ssid_2
+      password: !secret wifi_password_2
+    - ssid: !secret wifi_ssid_3
+      password: !secret wifi_password_3
 
   ap:
-    ssid: "KLAND_GRGLCK"
-    password: "MrvllVlly_2022"
+    ssid: !secret wifi_ssid_ap
+    password: !secret gen_password
 
 web_server:
   port: 80
@@ -31,21 +31,21 @@ web_server:
 logger:
   level: DEBUG
 
-# api: // Descomentar para activar la API. Si activo, se reinicia a los 15min si no hay clientes
+# api: // Uncomment to enable API. If active, node will be reboot after 15min if no clients
 
 globals:
   - id: block_time
     type: int
-    initial_value: "10000" # Tiempo de bloqueo en milisegundos
+    initial_value: "10000" # Block time in milliseconds
   - id: blocked_lock
     type: bool
     initial_value: "false"
   - id: lock_delay_time
     type: int
-    initial_value: "200" # Retardo antes de activar el relé (ms)
+    initial_value: "200" # Delay before relay ON(ms)
   - id: lock_time
     type: int
-    initial_value: "500" # Tiempo de activación del relé (ms)
+    initial_value: "500" # Relay open time(ms)
 
 number:
   - platform: template
@@ -116,39 +116,3 @@ switch:
     on_turn_on:
       - delay: !lambda "return id(lock_time);"
       - switch.turn_off: relay_output_lock
-
-i2c:
-  sda: GPIO5
-  scl: GPIO4
-  scan: true
-  frequency: 400kHz
-
-display:
-  - platform: ssd1306_i2c
-    model: "SSD1306 128x64"
-    reset_pin: D0
-    address: 0x3C
-    contrast: 35%
-    lambda: |-
-      it.print(0, 0, id(font_12), " +|- Klint -|+");
-      it.printf(0, 12, id(font_12), "Block: %s", id(blocked_lock) ? "ON" : "OFF");
-      it.printf(0, 24, id(font_12), "Lock: %s", id(relay_output_lock) ? "ON" : "OFF");
-      it.printf(0, 36, id(font_12), "Lights: %s", id(relay_output_porche_lights) ? "ON" : "OFF");
-      it.printf(0, 48, id(font_12), "%.1f°C | %.1f%%", id(porche_temperature).state, id(porche_humidity).state);
-
-font:
-  - file: "font.ttf"
-    id: font_12
-    size: 12
-
-sensor:
-  - platform: dht
-    model: DHT11
-    pin: GPIO2
-    temperature:
-      name: "Porche Temperature"
-      id: porche_temperature
-    humidity:
-      name: "Porche Humidity"
-      id: porche_humidity
-    update_interval: 10min
