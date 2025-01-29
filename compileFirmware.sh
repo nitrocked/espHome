@@ -28,7 +28,7 @@ fi
 # Create a menu option by listing all .yaml files inside the configurations folder (give a number to each one) and let me choose one by numbering them 
 CONFIGURATIONS_FOLDER="./nodes"
 FIRMWARES_FOLDER="./firmwares"
-CONFIGURATIONS=($(ls -d ${CONFIGURATIONS_FOLDER}/*.yaml))
+CONFIGURATIONS=($(ls -d ${CONFIGURATIONS_FOLDER}/*.yaml | grep -v "secrets.yaml"))
 
 # Display the list of configurations
 echo ""
