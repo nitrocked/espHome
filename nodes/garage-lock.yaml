@@ -1,0 +1,127 @@
+esphome:
+  name: garage-lock
+  platform: esp8266
+  board: nodemcu
+  project:
+    name: "vcj.klint-land"
+    version: "1.0.0"
+
+ota:
+  - platform: esphome
+    password: !secret gen_password
+    port: 8266
+
+wifi:
+  networks:
+    - ssid: !secret wifi_ssid_1
+      password: !secret gen_password
+    - ssid: !secret wifi_ssid_2
+      password: !secret wifi_password_2
+    - ssid: !secret wifi_ssid_3
+      password: !secret wifi_password_3
+
+  ap:
+    ssid: !secret wifi_ssid_ap
+    password: !secret gen_password
+
+web_server:
+  port: 80
+  version: 2
+
+logger:
+  level: DEBUG
+
+# api: // Uncomment to enable API. If active, node will be reboot after 15min if no clients
+
+globals:
+  - id: block_time
+    type: int
+    initial_value: "5" # Block time (s)
+  - id: blocked_lock
+    type: bool
+    initial_value: "false"
+  - id: lock_delay_time
+    type: int
+    initial_value: "200" # Delay before relay ON (ms)
+  - id: lock_time
+    type: int
+    initial_value: "500" # Relay open time (ms)
+
+number:
+  - platform: template
+    name: "Block Time (ms)"
+    icon: "mdi:timer"
+    min_value: 5
+    max_value: 120
+    step: 5
+    unit_of_measurement: s
+    set_action:
+      - lambda: |-
+          id(block_time) = (int) x * 1000;
+
+  - platform: template
+    name: "Lock Delay Time (ms)"
+    icon: "mdi:timer"
+    min_value: 200
+    max_value: 2000
+    step: 100
+    unit_of_measurement: ms
+    set_action:
+      - lambda: |-
+          id(lock_delay_time) = (int) x;
+
+  - platform: template
+    name: "Lock Time Open (ms)"
+    icon: "mdi:timer"
+    min_value: 500
+    max_value: 4000
+    step: 500
+    unit_of_measurement: ms
+    set_action:
+      - lambda: |-
+          id(lock_time) = (int) x;
+
+binary_sensor:
+  - platform: gpio
+    pin: GPIO14
+    name: "24V Input"
+    device_class: running
+    filters:
+      - delayed_on: 50ms
+    on_press:
+      - logger.log: ">>> 24V Input ON"
+      - if:
+          condition:
+            lambda: return !id(blocked_lock);
+          then:
+            - logger.log: ">>> Entering block time"
+            - lambda: id(blocked_lock) = true;
+            - delay: !lambda "return id(lock_delay_time);" # Delay before relay ON (ms)
+            - switch.turn_on: relay_output_lock
+            - delay: !lambda "return id(block_time);"
+            - lambda: id(blocked_lock) = false;
+  
+  - platform: template
+    name: "Block Status"
+    id: blocked_lock_status
+    device_class: lock
+    lambda: |-
+      return id(blocked_lock);
+
+switch:
+  - platform: gpio
+    pin: GPIO13
+    name: "Porche Lights"
+    id: relay_output_porche_lights
+    inverted: true
+    icon: "mdi:lightbulb"
+
+  - platform: gpio
+    pin: GPIO12
+    name: "Gate Lock"
+    id: relay_output_lock
+    inverted: true
+    icon: "mdi:gate"
+    on_turn_on:
+      - delay: !lambda "return id(lock_time);" # Relay open time (ms)
+      - switch.turn_off: relay_output_lock
