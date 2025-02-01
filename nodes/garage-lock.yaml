@@ -42,14 +42,14 @@ globals:
     initial_value: "false"
   - id: lock_delay_time
     type: int
-    initial_value: "200" # Delay before relay ON (ms)
+    initial_value: "200" # Delay before relay ON(ms)
   - id: lock_time
     type: int
-    initial_value: "500" # Relay open time (ms)
+    initial_value: "500" # Relay open time(ms)
 
 number:
   - platform: template
-    name: "Block Time (ms)"
+    name: "Block Time (s)"
     icon: "mdi:timer"
     min_value: 5
     max_value: 120
@@ -71,7 +71,7 @@ number:
           id(lock_delay_time) = (int) x;
 
   - platform: template
-    name: "Lock Time Open (ms)"
+    name: "Lock Time (ms)"
     icon: "mdi:timer"
     min_value: 500
     max_value: 4000
@@ -87,26 +87,17 @@ binary_sensor:
     name: "24V Input"
     device_class: running
     filters:
-      - delayed_on: 50ms
+      - delayed_on: 30ms
     on_press:
-      - logger.log: ">>> 24V Input ON"
       - if:
           condition:
             lambda: return !id(blocked_lock);
           then:
-            - logger.log: ">>> Entering block time"
             - lambda: id(blocked_lock) = true;
-            - delay: !lambda "return id(lock_delay_time);" # Delay before relay ON (ms)
+            - delay: !lambda "return id(lock_delay_time);"
             - switch.turn_on: relay_output_lock
             - delay: !lambda "return id(block_time);"
             - lambda: id(blocked_lock) = false;
-  
-  - platform: template
-    name: "Block Status"
-    id: blocked_lock_status
-    device_class: lock
-    lambda: |-
-      return id(blocked_lock);
 
 switch:
   - platform: gpio
@@ -123,5 +114,5 @@ switch:
     inverted: true
     icon: "mdi:gate"
     on_turn_on:
-      - delay: !lambda "return id(lock_time);" # Relay open time (ms)
+      - delay: !lambda "return id(lock_delay_time);"
       - switch.turn_off: relay_output_lock
